@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaflet Geoman - Editor GeoJSON & Atribut Tabel</title>
+
+    <!-- CSS Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <!-- CSS Leaflet Geoman -->
+    <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.14.2/dist/leaflet-geoman.css" />
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body,
+        html {
+            height: 100%;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        
+        #map {
+            flex: 1;
+            width: 100%;
+            position: relative;
+        }
+        /* Panel Control Overlay Drag/Drop & Export */
+        
+        #drop-zone {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 12px;
+            border: 2px dashed #007bff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            max-width: 260px;
+            transition: background 0.3s;
+        }
+        
+        #drop-zone.dragover {
+            background: #e6f2ff;
+            border-color: #0056b3;
+        }
+        
+        .btn-container {
+            margin-top: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        .btn {
+            padding: 6px 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        
+        .btn-export {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .btn-export:hover {
+            background-color: #218838;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .btn-upload {
+            background-color: #007bff;
+            color: white;
+        }
+        
+        .btn-upload:hover {
+            background-color: #0069d9;
+        }
+        
+        .btn-table {
+            background-color: #17a2b8;
+            color: white;
+        }
+        
+        .btn-table:hover {
+            background-color: #138496;
+        }
+        /* Panel Tabel Atribut Bottom Drawer */
+        
+        #attribute-panel {
+            height: 250px;
+            background: #ffffff;
+            border-top: 2px solid #ccc;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+            z-index: 1001;
+        }
+        
+        .table-toolbar {
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .table-container {
+            flex: 1;
+            overflow: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            text-align: left;
+        }
+        
+        th,
+        td {
+            border: 1px solid #dee2e6;
+            padding: 6px 10px;
+        }
+        
+        th {
+            background-color: #e9ecef;
+            position: sticky;
+            top: 0;
+            z-index: 2;
+        }
+        
+        tr:hover {
+            background-color: #f1f3f5;
+            cursor: pointer;
+        }
+        
+        td input {
+            width: 100%;
+            border: 1px solid transparent;
+            background: transparent;
+            padding: 2px 4px;
+            font-size: 12px;
+        }
+        
+        td input:focus {
+            background: #fff;
+            border-color: #80bdff;
+            outline: none;
+        }
+        
+        .btn-sm {
+            padding: 4px 8px;
+            font-size: 11px;
+        }
+        
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="app-container">
+        <div id="map">
+            <!-- Overlay UI Drag/Drop & Controls -->
+            <div id="drop-zone">
+                <p style="font-size: 12px; color: #333;"><strong>Drag & Drop GeoJSON</strong></p>
+                <div class="btn-container">
+                    <input type="file" id="file-input" class="file-input" accept=".geojson,.json">
+                    <button class="btn btn-upload" onclick="document.getElementById('file-input').click()">Pilih File GeoJSON</button>
+                    <button class="btn btn-export" id="export-btn">Export GeoJSON</button>
+                    <button class="btn btn-table" id="toggle-table-btn">Sembunyikan Tabel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel Tabel Atribut -->
+        <div id="attribute-panel">
+            <div class="table-toolbar">
+                <strong>Tabel Atribut Fitur</strong>
+                <button class="btn btn-sm btn-upload" id="add-column-btn">+ Tambah Kolom</button>
+                <span style="font-size: 11px; color: #666;">* Klik sel untuk mengedit nilai. Klik baris untuk zoom ke objek.</span>
+            </div>
+            <div class="table-container">
+                <table id="attribute-table">
+                    <thead>
+                        <tr id="table-head">
+                            <th>ID Layer</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body">
+                        <!-- Data baris diinjeksi via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- JS Leaflet -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- JS Leaflet Geoman -->
+    <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.14.2/dist/leaflet-geoman.min.js"></script>
+
+    <script>
+        // 1. Inisialisasi Peta (maxZoom sampai 22)
+        const map = L.map('map', {
+            maxZoom: 22
+        }).setView([-6.2088, 106.8456], 12);
+
+        // 2. Definisi Basemap Google & OSM (maxNativeZoom: 20/21, maxZoom: 22)
+        const googleRoad = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+            maxZoom: 22,
+            maxNativeZoom: 20,
+            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+            attribution: '&copy; Google Maps'
+        });
+
+        const googleSatellite = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+            maxZoom: 22,
+            maxNativeZoom: 20,
+            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+            attribution: '&copy; Google Maps'
+        });
+
+        const googleHybrid = L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+            maxZoom: 22,
+            maxNativeZoom: 20,
+            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+            attribution: '&copy; Google Maps'
+        });
+
+        const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 22,
+            maxNativeZoom: 19,
+            attribution: '&copy; OpenStreetMap'
+        });
+
+        // Tambahkan Default Basemap
+        googleHybrid.addTo(map);
+
+        // Layer Control Basemap
+        const baseMaps = {
+            "Google Hybrid": googleHybrid,
+            "Google Satellite": googleSatellite,
+            "Google Road": googleRoad,
+            "OpenStreetMap": osm
+        };
+        L.control.layers(baseMaps, null, {
+            position: 'topright'
+        }).addTo(map);
+
+        // 3. FeatureGroup untuk Layer GeoJSON Aktif
+        const activeFeatureGroup = L.featureGroup().addTo(map);
+
+        // Setup Geoman
+        map.pm.addControls({
+            position: 'topleft',
+            drawMarker: true,
+            drawPolyline: true,
+            drawRectangle: true,
+            drawPolygon: true,
+            drawCircleMarker: true,
+            drawCircle: false,
+            editMode: true,
+            dragMode: true,
+            cutPolygon: true,
+            removalMode: true,
+        });
+
+        // Handle Objek Baru Digambar oleh Geoman
+        map.on('pm:create', (e) => {
+            const layer = e.layer;
+            if (!layer.feature) {
+                layer.feature = {
+                    type: "Feature",
+                    properties: {}
+                };
+            }
+            activeFeatureGroup.addLayer(layer);
+            renderAttributeTable();
+        });
+
+        // Handle Hapus Objek via Geoman
+        map.on('pm:remove', (e) => {
+            renderAttributeTable();
+        });
+
+        // 4. Load GeoJSON
+        function loadGeoJSONData(geojsonData) {
+            try {
+                const parsedData = typeof geojsonData === 'string' ? JSON.parse(geojsonData) : geojsonData;
+
+                L.geoJSON(parsedData, {
+                    onEachFeature: function(feature, layer) {
+                        // Pastikan struktur feature.properties ada
+                        layer.feature = feature || {
+                            type: "Feature",
+                            properties: {}
+                        };
+                        if (!layer.feature.properties) layer.feature.properties = {};
+
+                        activeFeatureGroup.addLayer(layer);
+                    }
+                });
+
+                const bounds = activeFeatureGroup.getBounds();
+                if (bounds.isValid()) {
+                    map.fitBounds(bounds);
+                }
+
+                renderAttributeTable();
+            } catch (error) {
+                alert("File GeoJSON tidak valid!");
+                console.error("GeoJSON Error:", error);
+            }
+        }
+
+        // 5. Tabel Atribut Interaktif
+        let attributeKeys = new Set();
+
+        function renderAttributeTable() {
+            const layers = activeFeatureGroup.getLayers();
+
+            // Kumpulkan seluruh key properti unik
+            attributeKeys.clear();
+            layers.forEach(layer => {
+                if (layer.feature && layer.feature.properties) {
+                    Object.keys(layer.feature.properties).forEach(k => attributeKeys.add(k));
+                }
+            });
+
+            const keysArray = Array.from(attributeKeys);
+
+            // Build Header Tabel
+            const theadTr = document.getElementById('table-head');
+            theadTr.innerHTML = `<th>ID Layer</th>`;
+            keysArray.forEach(key => {
+                theadTr.innerHTML += `<th>${key} <button style="color:red; cursor:pointer;" onclick="deleteColumn('${key}')">×</button></th>`;
+            });
+            theadTr.innerHTML += `<th>Aksi</th>`;
+
+            // Build Body Tabel
+            const tbody = document.getElementById('table-body');
+            tbody.innerHTML = '';
+
+            layers.forEach(layer => {
+                const layerId = L.stamp(layer);
+                const props = layer.feature.properties || {};
+
+                const tr = document.createElement('tr');
+                tr.onclick = (e) => {
+                    // Jangan trigger zoom jika klik tombol/input
+                    if (['INPUT', 'BUTTON'].includes(e.target.tagName)) return;
+                    zoomToLayer(layerId);
+                };
+
+                let rowHtml = `<td>#${layerId}</td>`;
+                keysArray.forEach(key => {
+                    const val = props[key] !== undefined ? props[key] : '';
+                    rowHtml += `<td><input type="text" value="${val}" onchange="updateAttribute(${layerId}, '${key}', this.value)"></td>`;
+                });
+                rowHtml += `<td><button class="btn btn-sm btn-danger" onclick="deleteLayer(${layerId})">Hapus</button></td>`;
+
+                tr.innerHTML = rowHtml;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Update Properti dari input Tabel
+        window.updateAttribute = function(layerId, key, val) {
+            const layer = activeFeatureGroup.getLayer(layerId);
+            if (layer) {
+                if (!layer.feature) layer.feature = {
+                    type: "Feature",
+                    properties: {}
+                };
+                if (!layer.feature.properties) layer.feature.properties = {};
+                layer.feature.properties[key] = val;
+            }
+        };
+
+        // Tambah Kolom Baru
+        document.getElementById('add-column-btn').addEventListener('click', () => {
+            const colName = prompt("Masukkan nama kolom/properti baru:");
+            if (colName && colName.trim() !== "") {
+                const cleanKey = colName.trim();
+                attributeKeys.add(cleanKey);
+
+                // Inisialisasi key ini di setiap layer
+                activeFeatureGroup.getLayers().forEach(layer => {
+                    if (!layer.feature) layer.feature = {
+                        type: "Feature",
+                        properties: {}
+                    };
+                    if (!layer.feature.properties) layer.feature.properties = {};
+                    if (!(cleanKey in layer.feature.properties)) {
+                        layer.feature.properties[cleanKey] = "";
+                    }
+                });
+
+                renderAttributeTable();
+            }
+        });
+
+        // Hapus Kolom
+        window.deleteColumn = function(key) {
+            if (confirm(`Hapus kolom "${key}" dari semua data?`)) {
+                activeFeatureGroup.getLayers().forEach(layer => {
+                    if (layer.feature && layer.feature.properties) {
+                        delete layer.feature.properties[key];
+                    }
+                });
+                renderAttributeTable();
+            }
+        };
+
+        // Hapus Fitur dari Tabel
+        window.deleteLayer = function(layerId) {
+            const layer = activeFeatureGroup.getLayer(layerId);
+            if (layer) {
+                activeFeatureGroup.removeLayer(layer);
+                renderAttributeTable();
+            }
+        };
+
+        // Zoom & Highlight ke Fitur dari Tabel
+        function zoomToLayer(layerId) {
+            const layer = activeFeatureGroup.getLayer(layerId);
+            if (layer) {
+                if (layer.getBounds) {
+                    map.fitBounds(layer.getBounds(), {
+                        maxZoom: 18
+                    });
+                } else if (layer.getLatLng) {
+                    map.setView(layer.getLatLng(), 18);
+                }
+
+                // Flash visual highlight singkat jika shape memilik fungsi setStyle
+                if (layer.setStyle) {
+                    const originalColor = layer.options.color || '#3388ff';
+                    layer.setStyle({
+                        color: '#ff0000',
+                        weight: 5
+                    });
+                    setTimeout(() => layer.setStyle({
+                        color: originalColor,
+                        weight: 3
+                    }), 1200);
+                }
+            }
+        }
+
+        // Toggle Tampilan Tabel
+        const toggleTableBtn = document.getElementById('toggle-table-btn');
+        const attributePanel = document.getElementById('attribute-panel');
+        toggleTableBtn.addEventListener('click', () => {
+            if (attributePanel.style.display === 'none') {
+                attributePanel.style.display = 'flex';
+                toggleTableBtn.innerText = 'Sembunyikan Tabel';
+            } else {
+                attributePanel.style.display = 'none';
+                toggleTableBtn.innerText = 'Tampilkan Tabel';
+            }
+            setTimeout(() => map.invalidateSize(), 200);
+        });
+
+        // 6. File Input & Drag/Drop Handlers
+        document.getElementById('file-input').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                loadGeoJSONData(event.target.result);
+            };
+            reader.readAsText(file);
+        });
+
+        const dropZone = document.getElementById('drop-zone');
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            }, false);
+        });
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    loadGeoJSONData(event.target.result);
+                };
+                reader.readAsText(files[0]);
+            }
+        });
+
+        // 7. Export GeoJSON
+        document.getElementById('export-btn').addEventListener('click', () => {
+            const geojsonData = activeFeatureGroup.toGeoJSON();
+
+            if (!geojsonData.features || geojsonData.features.length === 0) {
+                alert("Tidak ada layer/fitur yang sedang tampil di peta untuk di-export.");
+                return;
+            }
+
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(geojsonData, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", "edited_geojson.geojson");
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        });
+    </script>
+</body>
+
+</html>
