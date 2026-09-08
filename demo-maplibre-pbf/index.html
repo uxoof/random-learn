@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo MapLibre JS - Vector Tiles SLS 2025 Advanced Selection</title>
+
+    <!-- MapLibre GL CSS -->
+    <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+
+    <style>
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        
+        #map {
+            width: 100%;
+            height: 100vh;
+        }
+        
+        .map-title {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 10px 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        }
+        
+        .map-title h3 {
+            margin: 0 0 5px 0;
+            font-size: 16px;
+            color: #333;
+        }
+        
+        .map-title p {
+            margin: 0;
+            font-size: 12px;
+            color: #666;
+        }
+        /* Custom Basemap Switcher Control */
+        
+        .basemap-control {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1;
+            background: #fff;
+            padding: 8px 12px;
+            border-radius: 4px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .basemap-control label {
+            font-size: 12px;
+            font-weight: bold;
+            color: #333;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        /* Mode Selector Control Panel */
+        
+        .mode-control {
+            position: absolute;
+            top: 150px;
+            right: 10px;
+            z-index: 1;
+        }
+        
+        .btn-mode {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 10px 14px;
+            font-size: 12px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn-mode.active {
+            background-color: #0d6efd;
+        }
+        /* Hover Tooltip */
+        
+        .hover-tooltip {
+            position: absolute;
+            z-index: 10;
+            display: none;
+            background: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
+            white-space: nowrap;
+        }
+        
+        .hover-tooltip .title {
+            font-weight: bold;
+            color: #00ffff;
+            margin-bottom: 2px;
+        }
+        
+        .hover-tooltip .sub {
+            font-size: 11px;
+            color: #ddd;
+        }
+        /* Panel Tabel Objek Terpilih */
+        
+        .selected-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 10px;
+            z-index: 1;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 12px;
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            max-width: 750px;
+            width: 90%;
+            max-height: 280px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .selected-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .selected-panel-header h4 {
+            margin: 0;
+            font-size: 14px;
+            color: #333;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 6px;
+        }
+        
+        .btn-export {
+            background-color: #28a745;
+            color: #fff;
+            border: none;
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .btn-reset {
+            background-color: #dc3545;
+            color: #fff;
+            border: none;
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .btn-export:disabled,
+        .btn-reset:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .table-wrapper {
+            overflow-x: auto;
+            overflow-y: auto;
+            max-height: 200px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        table.selected-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+            white-space: nowrap;
+        }
+        
+        table.selected-table th,
+        table.selected-table td {
+            border: 1px solid #eee;
+            padding: 6px;
+            text-align: left;
+        }
+        
+        table.selected-table th {
+            background-color: #f4f4f4;
+            position: sticky;
+            top: 0;
+            z-index: 2;
+        }
+        
+        .btn-delete {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            padding: 2px 6px;
+            font-size: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="map-title">
+        <h3>Demo MapLibre GL JS</h3>
+        <p>Vector Tiles SLS 2025 + Mode Memilih & Export</p>
+    </div>
+
+    <!-- UI Pemilih Peta Dasar (Basemap Switcher) -->
+    <div class="basemap-control">
+        <label><input type="radio" name="basemap" value="google-road" checked> Google Road</label>
+        <label><input type="radio" name="basemap" value="google-satellite"> Google Satellite</label>
+        <label><input type="radio" name="basemap" value="google-hybrid"> Google Hybrid</label>
+        <label><input type="radio" name="basemap" value="osm"> OpenStreetMap</label>
+    </div>
+
+    <!-- Tombol Sakelar Mode Memilih -->
+    <div class="mode-control">
+        <button id="btn-select-mode" class="btn-mode">
+            <span>Mode Memilih: OFF</span>
+        </button>
+    </div>
+
+    <!-- Tooltip Mengikuti Mouse -->
+    <div id="tooltip" class="hover-tooltip"></div>
+
+    <!-- Panel Tabel Data Objek Terpilih -->
+    <div class="selected-panel">
+        <div class="selected-panel-header">
+            <h4>Objek Terpilih (<span id="selected-count">0</span>)</h4>
+            <div class="action-buttons">
+                <button id="btn-reset" class="btn-reset" disabled>Hapus Semua</button>
+                <button id="btn-export" class="btn-export" disabled>Export GeoJSON</button>
+            </div>
+        </div>
+        <div class="table-wrapper">
+            <table class="selected-table">
+                <thead id="selected-table-head">
+                    <tr>
+                        <th>Aksi</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="selected-table-body">
+                    <tr>
+                        <td colspan="2" style="text-align: center; color: #888;">Belum ada objek dipilih. Aktifkan 'Mode Memilih' lalu klik pada peta.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <!-- MapLibre GL JS -->
+    <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+
+    <script>
+        // State Global
+        let selectedFeaturesMap = new Map();
+        let isSelectMode = false;
+
+        // 1. Inisialisasi Peta MapLibre
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: {
+                version: 8,
+                glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+                sources: {
+                    'google-road-source': {
+                        type: 'raster',
+                        tiles: ['https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}'],
+                        tileSize: 256,
+                        attribution: '&copy; Google Maps'
+                    },
+                    'google-satellite-source': {
+                        type: 'raster',
+                        tiles: ['https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}'],
+                        tileSize: 256,
+                        attribution: '&copy; Google Maps'
+                    },
+                    'google-hybrid-source': {
+                        type: 'raster',
+                        tiles: ['https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'],
+                        tileSize: 256,
+                        attribution: '&copy; Google Maps'
+                    },
+                    'osm-source': {
+                        type: 'raster',
+                        tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                        tileSize: 256,
+                        attribution: '&copy; OpenStreetMap contributors'
+                    },
+                    'sls-pbf-source': {
+                        type: 'vector',
+                        tiles: [
+                            'http://geoserver.bps.go.id/gwc/service/tms/1.0.0/wilkerstat:sls_2025_1@EPSG:900913@pbf/{z}/{x}/{y}.pbf'
+                        ],
+                        scheme: 'tms',
+                        minzoom: 0,
+                        maxzoom: 19
+                    },
+                    'selected-source': {
+                        type: 'geojson',
+                        data: {
+                            type: 'FeatureCollection',
+                            features: []
+                        }
+                    }
+                },
+                layers: [{
+                        id: 'google-road-layer',
+                        type: 'raster',
+                        source: 'google-road-source',
+                        layout: {
+                            visibility: 'visible'
+                        }
+                    }, {
+                        id: 'google-satellite-layer',
+                        type: 'raster',
+                        source: 'google-satellite-source',
+                        layout: {
+                            visibility: 'none'
+                        }
+                    }, {
+                        id: 'google-hybrid-layer',
+                        type: 'raster',
+                        source: 'google-hybrid-source',
+                        layout: {
+                            visibility: 'none'
+                        }
+                    }, {
+                        id: 'osm-layer',
+                        type: 'raster',
+                        source: 'osm-source',
+                        layout: {
+                            visibility: 'none'
+                        }
+                    },
+
+                    {
+                        id: 'sls-fill',
+                        type: 'fill',
+                        source: 'sls-pbf-source',
+                        'source-layer': 'sls_2025_1',
+                        paint: {
+                            'fill-color': '#00ffff',
+                            'fill-opacity': 0.25
+                        }
+                    }, {
+                        id: 'selected-fill',
+                        type: 'fill',
+                        source: 'selected-source',
+                        paint: {
+                            'fill-color': '#28a745',
+                            'fill-opacity': 0.6
+                        }
+                    }, {
+                        id: 'selected-line',
+                        type: 'line',
+                        source: 'selected-source',
+                        paint: {
+                            'line-color': '#0056b3',
+                            'line-width': 2.5
+                        }
+                    }, {
+                        id: 'sls-line',
+                        type: 'line',
+                        source: 'sls-pbf-source',
+                        'source-layer': 'sls_2025_1',
+                        paint: {
+                            'line-color': '#ff0055',
+                            'line-width': 1.5
+                        }
+                    }, {
+                        id: 'sls-label',
+                        type: 'symbol',
+                        source: 'sls-pbf-source',
+                        'source-layer': 'sls_2025_1',
+                        minzoom: 13,
+                        layout: {
+                            'text-field': ['get', 'nmsls'],
+                            'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+                            'text-size': 11,
+                            'text-anchor': 'center',
+                            'text-max-width': 8
+                        },
+                        paint: {
+                            'text-color': '#ffffff',
+                            'text-halo-color': '#000000',
+                            'text-halo-width': 2
+                        }
+                    }
+                ]
+            },
+            center: [106.827153, -6.175392],
+            zoom: 14
+        });
+
+        // Pindahkan tombol navigasi/zoom ke sebelah kiri atas di bawah judul
+        const navControl = new maplibregl.NavigationControl();
+        map.addControl(navControl, 'top-left');
+
+        // Switcher Basemap
+        const basemapLayers = ['google-road-layer', 'google-satellite-layer', 'google-hybrid-layer', 'osm-layer'];
+        document.querySelectorAll('input[name="basemap"]').forEach((radio) => {
+            radio.addEventListener('change', (e) => {
+                const targetLayerId = `${e.target.value}-layer`;
+                basemapLayers.forEach((layerId) => {
+                    if (map.getLayer(layerId)) {
+                        map.setLayoutProperty(layerId, 'visibility', layerId === targetLayerId ? 'visible' : 'none');
+                    }
+                });
+            });
+        });
+
+        // 2. TOGGLE MODE MEMILIH & KUNCI ZOOM
+        const btnSelectMode = document.getElementById('btn-select-mode');
+
+        btnSelectMode.addEventListener('click', () => {
+            isSelectMode = !isSelectMode;
+
+            if (isSelectMode) {
+                btnSelectMode.classList.add('active');
+                btnSelectMode.innerHTML = '<span>Mode Memilih: ON</span>';
+
+                // Kunci Fitur Zoom Peta
+                map.scrollZoom.disable();
+                map.doubleClickZoom.disable();
+                map.boxZoom.disable();
+                map.touchZoomRotate.disable();
+                map.setMinZoom(map.getZoom());
+                map.setMaxZoom(map.getZoom());
+            } else {
+                btnSelectMode.classList.remove('active');
+                btnSelectMode.innerHTML = '<span>Mode Memilih: OFF</span>';
+
+                // Buka Kunci Fitur Zoom Peta
+                map.scrollZoom.enable();
+                map.doubleClickZoom.enable();
+                map.boxZoom.enable();
+                map.touchZoomRotate.enable();
+                map.setMinZoom(0);
+                map.setMaxZoom(22);
+            }
+        });
+
+        // 3. HOVER TOOLTIP
+        const tooltip = document.getElementById('tooltip');
+
+        map.on('mousemove', 'sls-fill', (e) => {
+            if (e.features.length > 0) {
+                const props = e.features[0].properties;
+                map.getCanvas().style.cursor = isSelectMode ? 'crosshair' : 'pointer';
+
+                const nmsls = props.nmsls || '-';
+                const nmdesa = props.nmdesa || '-';
+                const nmkec = props.nmkec || '-';
+                const nmkab = props.nmkab || '-';
+
+                tooltip.innerHTML = `
+                    <div class="title">${nmsls}</div>
+                    <div class="sub">${nmdesa}, ${nmkec}, ${nmkab}</div>
+                `;
+
+                tooltip.style.left = e.point.x + 15 + 'px';
+                tooltip.style.top = e.point.y + 15 + 'px';
+                tooltip.style.display = 'block';
+            }
+        });
+
+        map.on('mouseleave', 'sls-fill', () => {
+            map.getCanvas().style.cursor = '';
+            tooltip.style.display = 'none';
+        });
+
+        // 4. MEMILIH OBJEK (DENGAN KEY UNIK IDSUBSLS)
+        map.on('click', 'sls-fill', (e) => {
+            if (!isSelectMode || !e.features.length) return;
+
+            const feature = e.features[0];
+            const props = feature.properties;
+
+            // Menggunakan idsubsls sebagai identifier utama
+            const featureId = props.idsubsls || props.idsls || props.idsoc || JSON.stringify(props);
+
+            if (!selectedFeaturesMap.has(featureId)) {
+                selectedFeaturesMap.set(featureId, {
+                    type: "Feature",
+                    geometry: feature.geometry,
+                    properties: {...props
+                    }
+                });
+                updateSelectedState();
+            }
+        });
+
+        // 5. UPDATE TABEL DENGAN ATRIBUT LENGKAP
+        function updateSelectedState() {
+            const selectedFeatures = Array.from(selectedFeaturesMap.values());
+
+            // Render Highlight di Peta
+            map.getSource('selected-source').setData({
+                type: 'FeatureCollection',
+                features: selectedFeatures
+            });
+
+            // Update UI Tombol
+            document.getElementById('selected-count').innerText = selectedFeatures.length;
+            document.getElementById('btn-export').disabled = selectedFeatures.length === 0;
+            document.getElementById('btn-reset').disabled = selectedFeatures.length === 0;
+
+            const thead = document.getElementById('selected-table-head');
+            const tbody = document.getElementById('selected-table-body');
+
+            if (selectedFeatures.length === 0) {
+                thead.innerHTML = `<tr><th>Aksi</th><th>Status</th></tr>`;
+                tbody.innerHTML = `<tr><td colspan="2" style="text-align: center; color: #888;">Belum ada objek dipilih. Aktifkan 'Mode Memilih' lalu klik pada peta.</td></tr>`;
+                return;
+            }
+
+            // Ekstraksi seluruh header properti unik yang tersedia
+            const attributeKeys = new Set();
+            selectedFeatures.forEach(f => {
+                Object.keys(f.properties).forEach(k => attributeKeys.add(k));
+            });
+            const keysArray = Array.from(attributeKeys);
+
+            // Buat Elemen Header Tabel
+            let headerHTML = `<tr><th>Aksi</th>`;
+            keysArray.forEach(key => {
+                headerHTML += `<th>${key}</th>`;
+            });
+            headerHTML += `</tr>`;
+            thead.innerHTML = headerHTML;
+
+            // Buat Baris Data Tabel
+            tbody.innerHTML = '';
+            selectedFeaturesMap.forEach((feature, id) => {
+                const props = feature.properties;
+                const tr = document.createElement('tr');
+
+                let rowHTML = `<td style="text-align:center;">
+                    <button class="btn-delete" onclick="removeSelected('${id}')">Hapus</button>
+                </td>`;
+
+                keysArray.forEach(key => {
+                    const val = props[key] !== undefined && props[key] !== null ? props[key] : '-';
+                    rowHTML += `<td>${val}</td>`;
+                });
+
+                tr.innerHTML = rowHTML;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Hapus Satu Objek Terpilih
+        window.removeSelected = function(id) {
+            selectedFeaturesMap.delete(id);
+            updateSelectedState();
+        };
+
+        // 6. TOMBOL RESET (HAPUS SEMUA OBJEK)
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            selectedFeaturesMap.clear();
+            updateSelectedState();
+        });
+
+        // 7. EXPORT OBJEK KE FILE GEOJSON DENGAN ATRIBUT LENGKAP
+        document.getElementById('btn-export').addEventListener('click', () => {
+            if (selectedFeaturesMap.size === 0) return;
+
+            const geojson = {
+                type: "FeatureCollection",
+                features: Array.from(selectedFeaturesMap.values())
+            };
+
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(geojson, null, 2));
+            const downloadAnchor = document.createElement('a');
+
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `sls_terpilih_lengkap_${new Date().getTime()}.geojson`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        });
+    </script>
+</body>
+
+</html>
